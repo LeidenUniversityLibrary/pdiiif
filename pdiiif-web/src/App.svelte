@@ -633,39 +633,5 @@
       {/if}
     {/if}
   </div>
-  <div
-    class="flex md:justify-start justify-center items-start mt-2 text-gray-500 text-xs"
-  >
-    <div class="mx-2">
-      <a
-        href="https://github.com/jbaiter/pdiiif"
-        target="_blank"
-        rel="noreferrer"
-        class="hover:text-gray-800"
-        ><GitHubIcon classes="text-gray-500 inline align-text-top w-4 h-4" />
-        {$_('links.source')}</a
-      >
-    </div>
-    <div class="mx-2">
-      <a
-        href="https://github.com/jbaiter/pdiiif/discussions"
-        target="_blank"
-        rel="noreferrer"
-        class="hover:text-gray-800"
-      >
-        <QuestionIcon classes="text-gray-500 inline align-text-top w-4 h-4" />
-        {$_('links.question')}</a
-      >
-    </div>
-    <div class="mx-2">
-      <a
-        href="https://github.com/jbaiter/pdiiif/issues/new"
-        target="_blank"
-        rel="noreferrer"
-        class="hover:text-gray-800"
-        ><ErrorIcon classes="text-gray-500 inline align-text-top w-4 h-4" />
-        {$_('links.problem')}</a
-      >
-    </div>
-  </div>
+
 </div>
