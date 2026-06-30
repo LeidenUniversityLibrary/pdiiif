@@ -1,0 +1,51 @@
+services:
+  pdiiif:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Uncomment and populate `args` when you need build-time variables, e.g.:
+      # args:
+      #   PDIIIF_SENTRY_DSN: ${PDIIIF_SENTRY_DSN}
+      #   PDIIIF_SENTRY_TUNNEL_ENDPOINT: ${PDIIIF_SENTRY_TUNNEL_ENDPOINT}
+    ports:
+      - "8080:8080"
+    environment:
+      # --- Server ---
+      CFG_PORT: 8080
+      CFG_HOST: 0.0.0.0
+
+      # --- Rate limiting (requests per 24 h window) ---
+      # CFG_RATELIMIT_PDF: 3000
+      # CFG_RATEIMIT_PDF_BURST: 50
+      # CFG_RATELIMIT_COVER: 3000
+      # CFG_RATEIMIT_COVER_BURST: 50
+
+      # --- Cover page ---
+      # Path inside the container to a custom Handlebars template for cover pages
+      # CFG_COVERPAGE_TEMPLATE: /templates/coverpage.hbs
+
+      # --- TLS (optional) ---
+      # CFG_SSL_CERT: /certs/server.crt
+      # CFG_SSL_KEY: /certs/server.key
+
+      # --- Sentry error tracking (optional) ---
+      # CFG_SENTRY_DSN: ${CFG_SENTRY_DSN}
+
+    # Playwright's headless Chromium requires SYS_ADMIN to create its own sandbox.
+    # For rootless Podman this is typically granted via the seccomp override below.
+    cap_add:
+      - SYS_ADMIN
+
+    # Allow the Chrome sandbox syscalls that are blocked by the default seccomp
+    # profile in rootless Podman / unprivileged containers.
+    security_opt:
+      - seccomp=unconfined
+
+    # Restart policy
+    restart: unless-stopped
+
+
+    # Optional volume mounts – uncomment as needed
+    # volumes:
+    #   - ./templates:/templates:ro   # custom cover-page Handlebars templates
+    #   - ./certs:/certs:ro           # TLS certificate & key

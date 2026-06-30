@@ -2,3 +2,12 @@ packages:
   - 'pdiiif-api'
   - 'pdiiif-lib'
   - 'pdiiif-web'
+
+onlyBuiltDependencies:
+  - '@playwright/browser-chromium'
+  - core-js
+  - es5-ext
+  - esbuild
+  - highlight.js
+  - playwright
+  - svelte-preprocess
