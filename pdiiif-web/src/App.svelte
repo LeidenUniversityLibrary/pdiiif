@@ -37,6 +37,10 @@
   export let initialManifestUrl: string | null = null;
   export let onError: ((err: Error) => void) | undefined = undefined;
 
+  // True when the app was opened with a ?manifest= URL param (launched from an external app).
+  // In that case we show a "Close" button after generation so the user can dismiss the tab.
+  const launchedFromExternalApp = initialManifestUrl !== null;
+
   // We use a self-hosted MITM page for the streamsaver service worker
   // to avoid GDPR issues.
   streamSaver.mitm = `${location.href.replace(
@@ -631,6 +635,14 @@
           {$_('buttons.cancel')}
         </button>
       {/if}
+    {/if}
+    {#if pdfFinished && !cancelled && launchedFromExternalApp}
+      <button
+        class="mx-auto mt-4 px-4 py-2 font-bold text-white bg-gray-700 rounded-lg hover:bg-gray-600 focus:bg-gray-800"
+        on:click={() => window.close()}
+      >
+        {$_('buttons.close')}
+      </button>
     {/if}
   </div>
 
