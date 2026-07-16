@@ -61,6 +61,97 @@ import {
   optimizeImage,
 } from './optimization.js';
 
+/** Fix duplicate IDs in IIIF manifests where AnnotationPages and Annotations
+ * share the same ID. This violates the IIIF Presentation API specification
+ * but occurs in some real-world manifests (e.g., from Leiden University).
+ * 
+ * When duplicate IDs exist, the @iiif/helpers vault gets confused and may
+ * skip or overwrite resources, resulting in blank pages in the PDF.
+ */
+function fixDuplicateAnnotationIds(
+  manifestJson: Manifest | Presentation2.Manifest
+): Manifest | Presentation2.Manifest {
+  const isIIIF3 = 'items' in manifestJson;
+  
+  if (!isIIIF3) {
+    // IIIF 2 uses different structure, typically less prone to this issue
+    log.info('Manifest is IIIF v2 format, skipping duplicate ID check');
+    return manifestJson;
+  }
+  
+  const manifest = manifestJson as Manifest;
+  let fixCount = 0;
+  let canvasCount = 0;
+  const seenIds = new Set<string>();
+
+  log.info(`Checking manifest for duplicate IDs. Total canvases: ${manifest.items?.length || 0}`);
+
+  // Iterate through all canvases
+  for (const canvas of manifest.items || []) {
+    canvasCount++;
+    const canvasId = (canvas as any).id;
+    log.debug(`Checking canvas ${canvasCount}: ${canvasId}`);
+
+    // Iterate through all annotation pages on the canvas
+    const annoPages = (canvas as any).items || [];
+    log.debug(`  Canvas has ${annoPages.length} annotation page(s)`);
+
+    for (let apIdx = 0; apIdx < annoPages.length; apIdx++) {
+      const annoPage = annoPages[apIdx];
+      const annoPageId = annoPage.id;
+      log.debug(`  AnnotationPage ${apIdx}: ${annoPageId}, has ${annoPage.items?.length || 0} annotation(s)`);
+
+      // Track this annotation page ID
+      if (seenIds.has(annoPageId)) {
+        log.warn(`  ⚠️  Duplicate AnnotationPage ID found: ${annoPageId} - this will be fixed`);
+        // Append a unique suffix to the annotation page ID
+        annoPage.id = `${annoPageId}#page-${canvasCount}-${apIdx}`;
+        fixCount++;
+        log.warn(`    Fixed AnnotationPage ID: ${annoPageId} -> ${annoPage.id}`);
+      } else {
+        seenIds.add(annoPageId);
+      }
+
+      if (!annoPage.items || !Array.isArray(annoPage.items)) {
+        log.warn(`  AnnotationPage ${apIdx} has no items array, skipping`);
+        continue;
+      }
+      
+      // Check each annotation in the annotation page
+      for (let i = 0; i < annoPage.items.length; i++) {
+        const anno = annoPage.items[i];
+        const annoId = anno.id;
+        log.debug(`    Annotation ${i}: ${annoId}`);
+
+        // If annotation ID has already been seen (includes AnnotationPage IDs), fix it
+        if (seenIds.has(annoId)) {
+          // Generate a unique ID by appending a suffix
+          const originalId = annoId;
+          anno.id = `${annoId}#annotation-${canvasCount}-${apIdx}-${i}`;
+          fixCount++;
+          log.warn(
+            `    ⚠️  DUPLICATE ID FOUND on canvas ${canvasCount}! Fixed: ${originalId} -> ${anno.id}`
+          );
+        } else {
+          seenIds.add(annoId);
+        }
+      }
+    }
+  }
+  
+  if (fixCount > 0) {
+    log.warn(
+      `✅ Fixed ${fixCount} duplicate ID(s) across ${canvasCount} canvases in manifest. ` +
+      `This indicates a malformed manifest that violates the IIIF specification. ` +
+      `The manifest provider should be notified to fix their implementation.`
+    );
+  } else {
+    log.info(`✓ No duplicate IDs found in manifest (checked ${canvasCount} canvases, ${seenIds.size} unique IDs)`);
+  }
+  
+  return manifest;
+}
+
 /** Progress information for rendering a progress bar or similar UI elements. */
 export interface ProgressStatus {
   /** Message code that should be mapped to a human readable description in a UI. */
@@ -217,6 +308,8 @@ export interface EstimationParams {
   mozjpegWasmLoader?: () => Promise<Uint8Array>;
   /** Pre-sampled list of canvases to use for estimating the size */
   sampleCanvases?: CanvasNormalized[];
+  /** Custom fetch function to use for fetching manifests, useful for avoiding CORS issues */
+  customFetch?: typeof fetch;
 }
 
 export type Estimation = {
@@ -287,7 +380,8 @@ export async function estimatePdfSize({
     fetch('https://unpkg.com/@jsquash/jpeg@1.5.0/codec/enc/mozjpeg_enc.wasm')
       .then((res) => res.arrayBuffer())
       .then((buf) => new Uint8Array(buf)),
-  sampleCanvases
+  sampleCanvases,
+  customFetch
 }: EstimationParams): Promise<Estimation> {
   let manifestId;
   if (typeof inputManifest === 'string') {
@@ -297,7 +391,7 @@ export async function estimatePdfSize({
       (inputManifest as Manifest).id ??
       (inputManifest as Presentation2.Manifest)['@id'];
   }
-  const manifestJson = await fetchManifestJson(manifestId);
+  const manifestJson = await fetchManifestJson(manifestId, customFetch);
   const manifest = await vault.loadManifest(manifestId, manifestJson);
   if (!manifest) {
     throw new Error(`Failed to load manifest from ${manifestId}`);
@@ -617,7 +711,8 @@ async function getCoverPagePdf(
   manifest: ManifestNormalized,
   languagePreference: Array<string>,
   endpoint?: string,
-  callback?: (params: CoverPageParams) => Promise<Uint8Array>
+  callback?: (params: CoverPageParams) => Promise<Uint8Array>,
+  originalManifestUrl?: string
 ): Promise<Uint8Array> {
   const params: CoverPageParams = {
     // NOTE: Manifest label is mandatory, i.e. safe to assert non-null
@@ -627,7 +722,7 @@ async function getCoverPagePdf(
       languagePreference,
       '; '
     ),
-    manifestUrl: manifest.id,
+    manifestUrl: originalManifestUrl ?? manifest.id,
     pdiiifVersion,
   };
   const thumbUrl = await getThumbnail(manifest, 512);
@@ -815,11 +910,61 @@ export async function convertManifest(
     manifestId =
       (inputManifest as Presentation2.Manifest)['@id'] ??
       (inputManifest as Manifest).id;
-    manifestJson = inputManifest;
+    // Deep clone the manifest to avoid mutating the original
+    manifestJson = JSON.parse(JSON.stringify(inputManifest));
   }
-  const manifest = await vault.loadManifest(manifestId, manifestJson);
+  
+  // Fix duplicate IDs in manifest (some IIIF servers incorrectly use the same ID
+  // for both AnnotationPage and Annotation, which violates the IIIF spec and
+  // causes the vault to skip or lose resources, resulting in blank pages)
+  log.info('🔧 Applying duplicate ID fix to manifest...');
+  manifestJson = fixDuplicateAnnotationIds(manifestJson);
+  
+  // IMPORTANT: Use a unique vault ID to ensure we don't have stale data
+  // The global vault can cache resources across multiple conversions, so we append
+  // a timestamp to force the vault to treat each conversion as a fresh load
+  log.info('🗑️  Creating unique vault ID to prevent caching conflicts...');
+  const originalManifestId = manifestId;
+  const vaultManifestId = `${manifestId}#pdiiif-${Date.now()}`;
+  log.debug(`   Original manifest ID: ${manifestId}`);
+  log.debug(`   Vault manifest ID: ${vaultManifestId}`);
+
+  // Update the ID in the manifest JSON to use the unique ID for vault indexing
+  if ('items' in manifestJson) {
+    (manifestJson as Manifest).id = vaultManifestId;
+  } else {
+    (manifestJson as Presentation2.Manifest)['@id'] = vaultManifestId;
+  }
+
+  log.info('📚 Loading manifest into vault...');
+  const manifest = await vault.loadManifest(vaultManifestId, manifestJson);
   if (!manifest) {
     throw new Error(`Failed to load manifest from ${manifestId}`);
+  }
+  log.info(`✓ Manifest loaded successfully: ${manifest.id}`);
+  log.info(`   Total items in manifest: ${manifest.items?.length || 0}`);
+
+  // Verify that canvases were loaded correctly
+  log.info('🔍 Verifying vault loaded all resources correctly...');
+  const vaultItems = vault.get(manifest.items);
+  log.info(`   Vault contains ${vaultItems.length} canvas references`);
+
+  // Check a few sample canvases to ensure their annotation pages loaded
+  for (let i = 0; i < Math.min(5, vaultItems.length); i++) {
+    const canvas = vaultItems[i] as any;
+    log.debug(`   Canvas ${i + 1}: ${canvas.id}, items: ${canvas.items?.length || 0}`);
+    if (canvas.items && canvas.items.length > 0) {
+      try {
+        const annoPages = vault.get(canvas.items);
+        log.debug(`      AnnotationPages loaded: ${annoPages.length}`);
+        if (annoPages.length > 0) {
+          const firstAnnoPage = annoPages[0] as any;
+          log.debug(`      First AnnotationPage: ${firstAnnoPage.id}, items: ${firstAnnoPage.items?.length || 0}`);
+        }
+      } catch (e) {
+        log.error(`      ⚠️  Failed to load annotation pages for canvas ${i + 1}:`, e);
+      }
+    }
   }
 
   const pdfMetadata = { ...metadata };
@@ -834,6 +979,26 @@ export async function convertManifest(
   const canvases = vault.get<CanvasNormalized>(
     manifest.items.filter((c) => canvasPredicate(c.id))
   );
+  log.info(`📋 Canvases to process: ${canvases.length}`);
+  
+  // Detailed logging for each canvas to verify they loaded correctly
+  for (let i = 0; i < Math.min(10, canvases.length); i++) {
+    const canvas = canvases[i];
+    log.debug(`  Canvas ${i + 1}/${canvases.length}: ${canvas.id}`);
+    log.debug(`    Dimensions: ${canvas.width}x${canvas.height}`);
+    log.debug(`    Items (annotation pages): ${canvas.items?.length || 0}`);
+    if (canvas.items && canvas.items.length > 0) {
+      try {
+        const annoPages = vault.get(canvas.items);
+        log.debug(`    Successfully retrieved ${annoPages.length} annotation page(s) from vault`);
+      } catch (e) {
+        log.error(`    ⚠️  Error retrieving annotation pages from vault:`, e);
+      }
+    }
+  }
+  if (canvases.length > 10) {
+    log.debug(`  ... and ${canvases.length - 10} more canvases`);
+  }
   const hasText = !!canvases.find((c) => !!getOcrReferences(c));
   const labels = canvases.map((canvas) =>
     canvas.label ? getI18nValue(canvas.label, languagePreference, '; ') : ''
@@ -935,7 +1100,8 @@ export async function convertManifest(
         manifest,
         languagePreference as string[],
         coverPageEndpoint,
-        coverPageCallback
+        coverPageCallback,
+        originalManifestId
       );
       log.debug('Inserting cover page into PDF');
       await pdfGen.insertCoverPages(coverPageData);
@@ -953,7 +1119,7 @@ export async function convertManifest(
       break;
     }
     try {
-      log.debug(`Waiting for data for canvas #${canvasIdx}`);
+      log.info(`📄 Processing canvas #${canvasIdx + 1}/${canvases.length} (PDF page ${canvasIdx + 1})`);
       const canvasData = await canvasFuts[canvasIdx];
       // This means the task was aborted, do nothing
       // FIXME: Doesn't this also happen in case of an error?
@@ -961,8 +1127,24 @@ export async function convertManifest(
         throw 'Aborted';
       }
       const canvas = vault.get<CanvasNormalized>(canvasData.canvas);
+      log.info(`   Canvas ID: ${canvas.id}`);
+      log.info(`   Canvas dimensions: ${canvas.width}x${canvas.height}`);
+
       const canvasInfo = canvasInfos[canvasIdx];
       const { images, ppi, text, annotations, imageFailures } = canvasData;
+
+      log.info(`   Images found: ${images.length}`);
+      log.info(`   Image failures: ${imageFailures.length}`);
+      log.info(`   Annotations: ${annotations.length}`);
+
+      if (images.length === 0 && imageFailures.length === 0) {
+        log.error(`   ⚠️  WARNING: No images found for canvas #${canvasIdx + 1}! This will result in a blank page.`);
+      }
+
+      images.forEach((img, idx) => {
+        log.debug(`   Image ${idx + 1}: ${img.resource.id}, size: ${img.width}x${img.height}, format: ${img.format}, data: ${img.data ? `${img.data.byteLength} bytes` : 'no data'}`);
+      });
+
       if (imageFailures.length > 0) {
         if (!report.failedImages) {
           report.failedImages = [];
@@ -978,6 +1160,7 @@ export async function convertManifest(
             ])
           ),
         };
+        log.error(`   ❌ Image failures on page ${canvasIdx + 1}:`, reportData.details);
         report.failedImages.push(reportData);
         progress.emitNotification({
           code: 'image-download-failure',

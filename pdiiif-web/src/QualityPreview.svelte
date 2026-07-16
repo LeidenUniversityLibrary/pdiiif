@@ -221,14 +221,16 @@
     ></canvas>
     <div class="flex justify-between p-1 bg-white">
       <button
-        class="w-6 h-6 bg-orange-200 rounded-full"
+        class="w-6 h-6 rounded-full transition-all hover:opacity-80 text-white font-bold"
+        style="background: linear-gradient(135deg, var(--accent), rgba(124,58,237,0.8));"
         on:click={() => updateZoom(-ZOOM_STEP)}>-</button
       >
-      <button class="w-6 h-6 bg-gray-200 rounded-full" on:click={resetViewport}
+      <button class="w-6 h-6 bg-gray-300 rounded-full transition-all hover:bg-gray-400" on:click={resetViewport}
         >↻</button
       >
       <button
-        class="w-6 h-6 bg-blue-200 rounded-full"
+        class="w-6 h-6 rounded-full transition-all hover:opacity-80 text-white font-bold"
+        style="background: linear-gradient(135deg, var(--accent), rgba(124,58,237,0.8));"
         on:click={() => updateZoom(ZOOM_STEP)}>+</button
       >
     </div>

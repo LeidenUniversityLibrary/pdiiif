@@ -39,7 +39,7 @@
       <div class="flex items-center mt-4">
         {#each Object.entries(choices) as [labelKey, action]}
           <button
-            class="px-2 py-1 mr-2 border border-blue-400 bg-white rounded-lg hover:border-green-400 text-black hover:font-bold"
+            class="px-3 py-2 mr-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 text-white font-semibold transition-all border border-white border-opacity-30"
             on:click={() => {
               action();
               dispatch('close');

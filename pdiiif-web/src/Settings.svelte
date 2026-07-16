@@ -214,12 +214,12 @@
       </select>
     </label>
     {#if optimizationConfig}
-      <label class="flex mb-2 mt-4">
+      <label class="flex mb-2 mt-4 text-white">
         <span class="w-32">
           {$_('settings.quality')}
         </span>
         <input
-          class="flex-grow"
+          class="flex-grow accent-accent"
           type="range"
           name="quality"
           min="1"
@@ -228,7 +228,7 @@
           value={optimizationConfig.quality}
           on:change={handleQualityChange}
         />
-        <span class="ml-2 mr-8">{optimizationConfig?.quality}</span>
+        <span class="ml-2 mr-8 text-white">{optimizationConfig?.quality}</span>
       </label>
       {#if previewImageData && previewImageMimeType}
         <QualityPreview
@@ -241,9 +241,10 @@
   </div>
   <button
     type="button"
-    class="bg-green-200 disabled:bg-gray-500 rounded-lg items-center p-2 text-gray-700 {showSettings
+    class="rounded-lg items-center p-2 text-white hover:bg-opacity-20 transition-all {showSettings
       ? 'hidden'
       : ''}"
+    style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.1);"
     title={$_('buttons.settings')}
     {disabled}
     on:click={() => {

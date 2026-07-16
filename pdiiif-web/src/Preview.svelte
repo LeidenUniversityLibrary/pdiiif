@@ -10,7 +10,7 @@
   export let canvasIdentifiers: string[] | undefined;
 </script>
 
-<div class="flex bg-indigo-100 p-2 rounded-md mb-4">
+<div class="flex bg-indigo-50 p-2 rounded-md mb-4">
   {#await infoPromise}
     <Spinner />
   {:then manifestInfo}
@@ -46,19 +46,19 @@
                     >
                   {/if}
                 {:else}
-                  <strong>{$_('errors.estimate_failure')}</strong>
+                  <strong class="text-red-400">{$_('errors.estimate_failure')}</strong>
                 {/if}
               {:catch}
-                <strong>{$_('errors.estimate_failure')}</strong>
+                <strong class="text-red-400">{$_('errors.estimate_failure')}</strong>
               {/await}
             </li>
           {/if}
         </ul>
       </div>
     {:else}
-      <p>{$_('errors.estimate_failure')}</p>
+      <p class="text-red-400">{$_('errors.estimate_failure')}</p>
     {/if}
   {:catch}
-    <p>{$_('errors.estimate_failure')}</p>
+    <p class="text-red-400">{$_('errors.estimate_failure')}</p>
   {/await}
 </div>

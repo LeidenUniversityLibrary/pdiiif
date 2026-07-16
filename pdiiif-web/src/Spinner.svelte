@@ -1,5 +1,5 @@
 <script lang="ts">
-  export let className: string = 'inline text-black h-5 w-5';
+  export let className: string = 'inline h-5 w-5';
 </script>
 
 <svg
@@ -7,6 +7,7 @@
   xmlns="http://www.w3.org/2000/svg"
   fill="none"
   viewBox="0 0 24 24"
+  style="color: var(--accent);"
 >
   <circle
     class="opacity-25"

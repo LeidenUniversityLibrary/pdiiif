@@ -28,9 +28,26 @@ export interface ManifestInfo {
 }
 
 export async function fetchManifestInfo(
-  manifestUrl: string
+  manifestUrl: string,
+  apiEndpoint?: string
 ): Promise<ManifestInfo> {
-  let manifestJson = await fetchManifestJson(manifestUrl);
+  let manifestJson;
+  
+  // Always use the proxy endpoint when available to avoid CORS issues
+  // The proxy endpoint handles server-to-server fetching which bypasses CORS restrictions
+  if (apiEndpoint) {
+    const encodedUrl = encodeURIComponent(manifestUrl);
+    const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
+    const response = await window.fetch(proxyUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch manifest: ${response.statusText}`);
+    }
+    manifestJson = await response.json();
+  } else {
+    // Fallback to direct fetch if no API endpoint is provided (shouldn't happen in normal use)
+    manifestJson = await fetchManifestJson(manifestUrl);
+  }
+  
   const manifest = (await vault.loadManifest(manifestUrl, manifestJson))!;
   const canvases = vault.get<CanvasNormalized>(manifest.items);
   const canvasIds = canvases.map((c) => c.id);

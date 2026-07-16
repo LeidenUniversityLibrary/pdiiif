@@ -6,6 +6,7 @@
   import {
     convertManifest,
     estimatePdfSize,
+    version,
     type Estimation,
     type ProgressStatus,
     type ProgressNotification,
@@ -22,7 +23,6 @@
   import GitHubIcon from './icons/GitHub.svelte';
   import QuestionIcon from './icons/Question.svelte';
 
-  import logoSvgUrl from '../assets/logo.svg';
   import ErrorIcon from './icons/Exclamation.svelte';
   import ProgressBar from './icons/ProgressBar.svelte';
   import {
@@ -147,18 +147,27 @@
   }
 
   function updateEstimate() {
+    // Create a custom fetch function that uses our proxy endpoint to avoid CORS issues
+    const proxyFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+      const encodedUrl = encodeURIComponent(url);
+      const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
+      return fetch(proxyUrl, init);
+    };
+
     // No async/await, since we need to keep a reference to the promise around
-    infoPromise = fetchManifestInfo(manifestUrl)
+    infoPromise = fetchManifestInfo(manifestUrl, apiEndpoint)
       .then((info) => {
         manifestInfo = info;
         estimatePromise = estimatePdfSize({
-          manifest: manifestInfo.manifest.id,
+          manifest: manifestInfo.manifest.id,  // Pass the manifest ID string
           filterCanvases: canvasIdentifiers,
           concurrency: 4,
           scaleFactor,
           numSamples: 8,
           optimization: optimizationConfig,
           sampleCanvases: sampledCanvases,
+          customFetch: proxyFetch,  // Use proxy for any manifest fetching
         }).then((estimation) => {
           if (!estimation.corsSupported) {
             // Show a warning if the Image API endpoint does not support CORS
@@ -224,7 +233,10 @@
   async function generatePdfClientSide(): Promise<void> {
     let manifestResp: Response;
     try {
-      manifestResp = await fetch(manifestUrl);
+      // Use the proxy endpoint to avoid CORS issues
+      const encodedUrl = encodeURIComponent(manifestUrl);
+      const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
+      manifestResp = await fetch(proxyUrl);
     } catch (err) {
       onError?.(err as Error);
       addNotification({
@@ -515,12 +527,13 @@
   }
 </script>
 
-<div class="w-full md:w-2/3 xl:w-1/2">
+<div class="w-full md:w-2/3 xl:w-1/2 max-w-2xl">
   <img
-    src={logoSvgUrl}
-    alt="pdiiif logo"
-    class="w-24 mx-auto mb-4 filter drop-shadow-lg"
+    src="/uni_logo.png"
+    alt="University logo"
+    class="w-48 h-48 mx-auto mb-4 object-contain rounded-xl"
   />
+  <h1 class="text-3xl font-bold text-center mb-6" style="color: var(--muted);">IIIF to PDF</h1>
   <div>
     {#each notifications as notification}
       <Notification
@@ -535,15 +548,15 @@
       </Notification>
     {/each}
   </div>
-  <div class="flex flex-col bg-blue-400 m-auto p-4 rounded-md shadow-lg">
+  <div class="flex flex-col m-auto p-8 rounded-2xl shadow-2xl" style="background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 10px 30px rgba(2,6,23,0.6);">
     {#if infoPromise}
       <Preview {infoPromise} {estimatePromise} {canvasIdentifiers} />
     {/if}
-    <div class="relative flex text-gray-700 justify-end">
+    <div class="relative flex justify-end">
       <input
         bind:this={manifestInput}
         class={classNames(
-          'w-full h-10 px-3 text-base placeholder-gray-600 rounded-l-lg',
+          'w-full h-12 px-4 text-base bg-white bg-opacity-10 text-white placeholder-gray-400 rounded-l-lg border border-white border-opacity-10 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all',
           {
             'border-4 border-red-500':
               manifestUrl.length > 0 && !manifestUrlIsValid,
@@ -558,7 +571,8 @@
       <button
         on:click={generatePdf}
         disabled={!manifestUrlIsValid || (currentProgress && !pdfFinished)}
-        class="inset-y-0 right-0 flex items-center p-1 px-2 font-bold text-white disabled:opacity-25 bg-brand rounded-r whitespace-nowrap"
+        class="inset-y-0 right-0 flex items-center p-1 px-4 font-semibold text-white disabled:opacity-25 rounded-r-lg whitespace-nowrap transition-all hover:shadow-lg"
+        style="background: linear-gradient(135deg, var(--accent), rgba(124,58,237,0.8)); box-shadow: 0 4px 15px rgba(124,58,237,0.3);"
       >
         <svg
           viewBox="0 0 24 24"
@@ -586,9 +600,9 @@
     {#if (currentProgress || queueState) && !pdfFinished && !cancelled}
       <div>
         {#if window.Notification && window.Notification.permission !== 'denied'}
-          <label
-            ><input type="checkbox" bind:checked={notifyWhenDone} />
-            {$_('buttons.notify')}</label
+          <label class="text-white flex items-center gap-2 mb-2"
+            ><input type="checkbox" bind:checked={notifyWhenDone} class="w-4 h-4 accent-purple-600" />
+            <span>{$_('buttons.notify')}</span></label
           >
         {/if}
         <ProgressBar
@@ -620,7 +634,7 @@
       </div>
       {#if abortController && !cancelled}
         <button
-          class="mx-auto mt-2 px-2 py-1 font-bold text-white disabled:opacity-25 bg-red-600 rounded-lg hover:bg-red-500 focus:bg-red-700"
+          class="mx-auto mt-2 px-4 py-2 font-semibold text-white disabled:opacity-25 bg-red-600 rounded-lg hover:bg-red-500 focus:bg-red-700 transition-all hover:shadow-lg"
           on:click={cancelGeneration}
           disabled={cancelRequested}
         >
@@ -638,7 +652,7 @@
     {/if}
     {#if pdfFinished && !cancelled && launchedFromExternalApp}
       <button
-        class="mx-auto mt-4 px-4 py-2 font-bold text-white bg-gray-700 rounded-lg hover:bg-gray-600 focus:bg-gray-800"
+        class="mx-auto mt-4 px-4 py-2 font-semibold text-white bg-white bg-opacity-10 rounded-lg hover:bg-opacity-20 transition-all border border-white border-opacity-20"
         on:click={() => window.close()}
       >
         {$_('buttons.close')}
@@ -646,4 +660,23 @@
     {/if}
   </div>
 
+  <!-- Version indicator and footer -->
+  <div class="text-center mt-6 text-sm opacity-60" style="color: var(--muted);">
+    <div class="flex items-center justify-center gap-4 mb-3">
+      <p>v{version}</p>
+      <!-- <a
+        href="https://github.com/jbaiter/pdiiif"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center hover:opacity-100 transition-opacity"
+        style="color: var(--accent);"
+        title="View on GitHub"
+      >
+        <GitHubIcon classes="w-5 h-5" />
+      </a> -->
+    </div>
+    <div class="pt-3 border-t border-white border-opacity-5">
+      <p class="text-xs">Secure and managed by Leiden University Library</p>
+    </div>
+  </div>
 </div>

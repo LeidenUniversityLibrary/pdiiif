@@ -216,6 +216,45 @@ if (process.env.CFG_SENTRY_DSN) {
   });
 }
 
+// Proxy endpoint to fetch manifests on behalf of the web client
+// This bypasses CORS issues since server-to-server requests don't have CORS restrictions
+app.get('/api/proxy-manifest', async (req, res) => {
+  const { manifestUrl } = req.query;
+  
+  if (!manifestUrl || typeof manifestUrl !== 'string') {
+    res.status(400).json({ error: 'manifestUrl parameter is required' });
+    return;
+  }
+
+  if (!manifestUrl.startsWith('http://') && !manifestUrl.startsWith('https://')) {
+    res.status(400).json({ error: 'manifestUrl must be a valid HTTP(S) URL' });
+    return;
+  }
+
+  try {
+    const manifestResp = await fetch(manifestUrl);
+    
+    if (!manifestResp.ok) {
+      res.status(manifestResp.status).json({
+        error: `Failed to fetch manifest: HTTP ${manifestResp.status}`,
+      });
+      return;
+    }
+
+    const manifestJson = await manifestResp.json();
+    res.status(200).json(manifestJson);
+  } catch (err) {
+    log.error({
+      message: 'Error proxying manifest request',
+      manifestUrl,
+      error: err,
+    });
+    res.status(500).json({
+      error: `Failed to fetch manifest: ${(err as Error).message}`,
+    });
+  }
+});
+
 app.get('/api/progress/:token', progressPathSpec, (req, res) => {
   const { token } = req.params;
   if (progressClients[token] !== undefined) {
