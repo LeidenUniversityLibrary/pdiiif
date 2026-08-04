@@ -147,12 +147,23 @@
   }
 
   function updateEstimate() {
-    // Create a custom fetch function that uses our proxy endpoint to avoid CORS issues
-    const proxyFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    // Create a custom fetch function that falls back to proxy only on CORS errors
+    const smartFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-      const encodedUrl = encodeURIComponent(url);
-      const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
-      return fetch(proxyUrl, init);
+
+      // Try direct fetch first
+      try {
+        return await fetch(input, init);
+      } catch (err) {
+        // If CORS error, fall back to proxy
+        if ((err as Error).message?.includes('CORS') || (err as Error).name === 'TypeError') {
+          console.log(`Falling back to proxy for: ${url}`);
+          const encodedUrl = encodeURIComponent(url);
+          const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
+          return fetch(proxyUrl, init);
+        }
+        throw err;
+      }
     };
 
     // No async/await, since we need to keep a reference to the promise around
@@ -167,7 +178,7 @@
           numSamples: 8,
           optimization: optimizationConfig,
           sampleCanvases: sampledCanvases,
-          customFetch: proxyFetch,  // Use proxy for any manifest fetching
+          customFetch: smartFetch,  // Use smart fetch with proxy fallback
         }).then((estimation) => {
           if (!estimation.corsSupported) {
             // Show a warning if the Image API endpoint does not support CORS
@@ -233,10 +244,20 @@
   async function generatePdfClientSide(): Promise<void> {
     let manifestResp: Response;
     try {
-      // Use the proxy endpoint to avoid CORS issues
-      const encodedUrl = encodeURIComponent(manifestUrl);
-      const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
-      manifestResp = await fetch(proxyUrl);
+      // Try direct fetch first, fall back to proxy only on CORS error
+      try {
+        manifestResp = await fetch(manifestUrl);
+      } catch (err) {
+        // If CORS error, use proxy as fallback
+        if ((err as Error).message?.includes('CORS') || (err as Error).name === 'TypeError') {
+          console.log(`CORS error detected, using proxy for manifest fetch: ${manifestUrl}`);
+          const encodedUrl = encodeURIComponent(manifestUrl);
+          const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
+          manifestResp = await fetch(proxyUrl);
+        } else {
+          throw err;
+        }
+      }
     } catch (err) {
       onError?.(err as Error);
       addNotification({
