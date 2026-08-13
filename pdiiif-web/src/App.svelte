@@ -1,6 +1,6 @@
 <script lang="ts">
   /// <reference types="wicg-file-system-access"/>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { _ } from 'svelte-i18n';
   import classNames from 'classnames';
   import {
@@ -71,6 +71,7 @@
   let infoPromise: Promise<ManifestInfo | void> | undefined;
   let estimatePromise: Promise<Estimation> | undefined;
   let sampledCanvases: CanvasNormalized[] | undefined;
+  let manifestRequestId = 0;
 
   // Only relevant for client-side generation
   let abortController: AbortController | undefined;
@@ -132,6 +133,7 @@
 
   /** Reset all state variables to their defaults. */
   function resetState() {
+    manifestRequestId += 1;
     manifestUrl = '';
     manifestUrlIsValid = undefined;
     currentProgress = undefined;
@@ -142,11 +144,25 @@
     infoPromise = undefined;
     estimatePromise = undefined;
     sampledCanvases = undefined;
+    canvasIdentifiers = undefined;
     scaleFactor = 1;
     optimizationConfig = undefined;
+    queueState = undefined;
+    notifyWhenDone = false;
+  }
+
+  /** Clear the current manifest and prepare the form for another PDF. */
+  async function clearManifest() {
+    clearNotifications();
+    resetState();
+    await tick();
+    manifestInput?.focus();
   }
 
   function updateEstimate() {
+    const requestId = ++manifestRequestId;
+    const requestedManifestUrl = manifestUrl;
+
     // Create a custom fetch function that falls back to proxy only on CORS errors
     const smartFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
@@ -167,8 +183,11 @@
     };
 
     // No async/await, since we need to keep a reference to the promise around
-    infoPromise = fetchManifestInfo(manifestUrl, apiEndpoint)
+    infoPromise = fetchManifestInfo(requestedManifestUrl, apiEndpoint)
       .then((info) => {
+        if (requestId !== manifestRequestId) {
+          return;
+        }
         manifestInfo = info;
         estimatePromise = estimatePdfSize({
           manifest: manifestInfo.manifest.id,  // Pass the manifest ID string
@@ -180,6 +199,9 @@
           sampleCanvases: sampledCanvases,
           customFetch: smartFetch,  // Use smart fetch with proxy fallback
         }).then((estimation) => {
+          if (requestId !== manifestRequestId) {
+            return estimation;
+          }
           if (!estimation.corsSupported) {
             // Show a warning if the Image API endpoint does not support CORS
             addNotification({
@@ -193,12 +215,15 @@
         return info;
       })
       .catch((err) => {
+        if (requestId !== manifestRequestId) {
+          return;
+        }
         infoPromise = undefined;
         onError?.(err);
         addNotification({
           type: 'error',
           message: $_('errors.manifest_fetch', {
-            values: { manifestUrl, errorMsg: err.message },
+            values: { manifestUrl: requestedManifestUrl, errorMsg: err.message },
           }),
           tags: ['validation'],
         });
@@ -554,7 +579,7 @@
     alt="University logo"
     class="w-48 h-48 mx-auto mb-4 object-contain rounded-xl"
   />
-  <h1 class="text-3xl font-bold text-center mb-6" style="color: var(--muted);">IIIF to PDF</h1>
+  <h1 class="text-3xl font-bold text-center mb-6" style="color: var(--muted);">IIIF PDF-generator</h1>
   <div>
     {#each notifications as notification}
       <Notification
@@ -573,27 +598,44 @@
     {#if infoPromise}
       <Preview {infoPromise} {estimatePromise} {canvasIdentifiers} />
     {/if}
-    <div class="relative flex justify-end">
-      <input
-        bind:this={manifestInput}
-        class={classNames(
-          'w-full h-12 px-4 text-base bg-white bg-opacity-10 text-white placeholder-gray-400 rounded-l-lg border border-white border-opacity-10 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all',
-          {
-            'border-4 border-red-500':
-              manifestUrl.length > 0 && !manifestUrlIsValid,
-          }
-        )}
-        type="url"
-        placeholder="Manifest URL"
-        name="manifest-url"
-        disabled={currentProgress !== undefined && !pdfFinished}
-        bind:value={manifestUrl}
-      />
+    <div class="flex justify-end">
+      <div class="relative flex-1 min-w-0">
+        <input
+          bind:this={manifestInput}
+          class={classNames(
+            'w-full h-12 px-4 pr-12 text-base bg-white bg-opacity-10 text-white placeholder-gray-400 rounded-l-lg border border-white border-opacity-10 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all',
+            {
+              'border-4 border-red-500':
+                manifestUrl.length > 0 && !manifestUrlIsValid,
+            }
+          )}
+          type="url"
+          placeholder="Manifest URL"
+          name="manifest-url"
+          disabled={currentProgress !== undefined && !pdfFinished}
+          bind:value={manifestUrl}
+        />
+        {#if manifestUrl}
+          <button
+            type="button"
+            class="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white opacity-70 transition-opacity hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-25"
+            on:click={clearManifest}
+            disabled={currentProgress !== undefined && !pdfFinished}
+            title={$_('buttons.clear_manifest')}
+            aria-label={$_('buttons.clear_manifest')}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5 fill-current">
+              <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.7 4.29 4.29 10.59 10.59 16.89 4.29z" />
+            </svg>
+          </button>
+        {/if}
+      </div>
       <button
+        type="submit"
         on:click={generatePdf}
         disabled={!manifestUrlIsValid || (currentProgress && !pdfFinished)}
         class="inset-y-0 right-0 flex items-center p-1 px-4 font-semibold text-white disabled:opacity-25 rounded-r-lg whitespace-nowrap transition-all hover:shadow-lg"
-        style="background: linear-gradient(135deg, var(--accent), rgba(124,58,237,0.8)); box-shadow: 0 4px 15px rgba(124,58,237,0.3);"
+        style="background: var(--accent); box-shadow: 0 4px 15px rgba(0,17,88,0.3);"
       >
         <svg
           viewBox="0 0 24 24"
@@ -622,7 +664,7 @@
       <div>
         {#if window.Notification && window.Notification.permission !== 'denied'}
           <label class="text-white flex items-center gap-2 mb-2"
-            ><input type="checkbox" bind:checked={notifyWhenDone} class="w-4 h-4 accent-purple-600" />
+            ><input type="checkbox" bind:checked={notifyWhenDone} class="w-4 h-4 accent-accent" />
             <span>{$_('buttons.notify')}</span></label
           >
         {/if}

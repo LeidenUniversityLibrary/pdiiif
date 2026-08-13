@@ -2,7 +2,7 @@
   export let currentProgress: { current: number; total: number };
 
   $: progressPercent = (currentProgress.current / currentProgress.total) * 100;
-  $: progressBarStyle = `width: ${progressPercent}%; background: linear-gradient(90deg, var(--accent), rgba(124,58,237,0.8));`;
+  $: progressBarStyle = `width: ${progressPercent}%; background: var(--accent);`;
 </script>
 
 <div

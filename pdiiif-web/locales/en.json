@@ -25,6 +25,7 @@
     },
     "buttons": {
         "generate": "Generate PDF",
+        "clear_manifest": "Clear manifest URL",
         "cancel": "Cancel PDF generation",
         "close": "Close",
         "settings": "Settings",

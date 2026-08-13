@@ -3,10 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --bg1: #0f172a;
-  --bg2: #071033;
-  --card: #0b1220;
-  --accent: #7c3aed;
+  --brand: #001158;
+  --bg1: #001158;
+  --bg2: #001158;
+  --card: #001158;
+  --accent: #001158;
   --muted: rgba(255, 255, 255, 0.72);
 }
 
