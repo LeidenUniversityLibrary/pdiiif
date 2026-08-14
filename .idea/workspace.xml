@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="BackgroundAgentGlobalSettings">
+    <option name="selectedModelId" value="auto" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="5c8e9842-d384-4a0b-b126-f103f3deb86a" name="Changes" comment="Update application version" />
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ComposerSettings">
+    <execution />
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_C:/Users/mwinyimbegurks/PhpstormProjects/pdiiif" value="3FcaFA9jjzWJv8JCQdU4y09vskA" />
+    </persistenceIdMap>
+  </component>
+  <component name="CopilotUserSelectedChatMode">
+    <option name="chatModeId" value="Agent" />
+  </component>
+  <component name="CopilotUserSelectedModel">
+    <selectedModels>
+      <entry key="agent-panel" value="Claude Sonnet 4.5" />
+      <entry key="chat-panel" value="Claude Sonnet 4.5" />
+    </selectedModels>
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="119" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="staging" />
+      </map>
+    </option>
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;ublrama&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/LeidenUniversityLibrary/pdiiif.git&quot;,
+    &quot;accountId&quot;: &quot;6063619c-7243-46d3-b2cf-1ba449de92d2&quot;
+  }
+}</component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="PhpDebugGeneral" listening_started="true" />
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 8,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3FcaFA9jjzWJv8JCQdU4y09vskA" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Agent" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_id" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="BACKGROUND" />
+        <option name="worktreeMode" value="WORKSPACE" />
+      </template>
+    </option>
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "copilot.chat.legacySessionMetadata.migrated": "true",
+    "last_opened_file_path": "C:/Users/mwinyimbegurks/PhpstormProjects/pdiiif",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "pnpm",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "ts.external.directory.path": "C:\\Users\\mwinyimbegurks\\PhpstormProjects\\pdiiif\\pdiiif-lib\\node_modules\\typescript\\lib",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\mwinyimbegurks\PhpstormProjects\pdiiif" />
+      <recent name="C:\Users\mwinyimbegurks\PhpstormProjects\pdiiif\pdiiif-web\public" />
+      <recent name="C:\Users\mwinyimbegurks\PhpstormProjects\pdiiif\.github\workflows" />
+      <recent name="C:\Users\mwinyimbegurks\PhpstormProjects\pdiiif\quadlets" />
+    </key>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-PS-253.32098.40" />
+        <option value="bundled-php-predefined-a98d8de5180a-0e0d91225499-com.jetbrains.php.sharedIndexes-PS-253.32098.40" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="5c8e9842-d384-4a0b-b126-f103f3deb86a" name="Changes" comment="" />
+      <created>1782376715595</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1782376715595</updated>
+      <workItem from="1782376716717" duration="13764000" />
+      <workItem from="1782806128215" duration="2907000" />
+      <workItem from="1782815244641" duration="14785000" />
+      <workItem from="1783340577672" duration="4288000" />
+      <workItem from="1783346996660" duration="6537000" />
+      <workItem from="1783927175931" duration="11311000" />
+      <workItem from="1783972128613" duration="5272000" />
+      <workItem from="1784059978827" duration="213000" />
+      <workItem from="1784186342297" duration="10769000" />
+      <workItem from="1785181159201" duration="5411000" />
+      <workItem from="1785828246333" duration="5321000" />
+      <workItem from="1785847786336" duration="6573000" />
+      <workItem from="1785909562822" duration="1210000" />
+      <workItem from="1786012375973" duration="218000" />
+      <workItem from="1786618791816" duration="3461000" />
+      <workItem from="1786692821067" duration="981000" />
+    </task>
+    <task id="LOCAL-00001" summary="Run application in podman container">
+      <option name="closed" value="true" />
+      <created>1782847915911</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1782847915911</updated>
+    </task>
+    <task id="LOCAL-00002" summary="Remove github links">
+      <option name="closed" value="true" />
+      <created>1782847950997</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1782847950997</updated>
+    </task>
+    <task id="LOCAL-00003" summary="feat: Add GitHub Actions workflow for build, push, and deploy process">
+      <option name="closed" value="true" />
+      <created>1783343527524</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1783343527524</updated>
+    </task>
+    <task id="LOCAL-00004" summary="refactor: Remove generate-quadlets step from build-push-deploy workflow">
+      <option name="closed" value="true" />
+      <created>1783343906475</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1783343906475</updated>
+    </task>
+    <task id="LOCAL-00005" summary="fix: Update port configuration in docker-compose.yml to use 8082">
+      <option name="closed" value="true" />
+      <created>1783935574078</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1783935574078</updated>
+    </task>
+    <task id="LOCAL-00006" summary="feat: Add &quot;Close&quot; button for external app launches in App.svelte">
+      <option name="closed" value="true" />
+      <created>1783937209754</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1783937209754</updated>
+    </task>
+    <task id="LOCAL-00007" summary="feat: Implement proxy endpoint for manifest fetching to avoid CORS issues and enhance UI styling">
+      <option name="closed" value="true" />
+      <created>1784227451829</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1784227451829</updated>
+    </task>
+    <task id="LOCAL-00008" summary="feat: Enhance manifest fetching with smart CORS handling and proxy fallback">
+      <option name="closed" value="true" />
+      <created>1785842402121</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1785842402121</updated>
+    </task>
+    <task id="LOCAL-00009" summary="feat: Validate image object allocation and handle format discrepancies in PDF generation">
+      <option name="closed" value="true" />
+      <created>1785874839654</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1785874839654</updated>
+    </task>
+    <task id="LOCAL-00010" summary="Update application version">
+      <option name="closed" value="true" />
+      <created>1785909827947</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1785909827947</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Run application in podman container" />
+    <MESSAGE value="Remove github links" />
+    <MESSAGE value="feat: Add GitHub Actions workflow for build, push, and deploy process" />
+    <MESSAGE value="refactor: Remove generate-quadlets step from build-push-deploy workflow" />
+    <MESSAGE value="fix: Update port configuration in docker-compose.yml to use 8082" />
+    <MESSAGE value="feat: Add &quot;Close&quot; button for external app launches in App.svelte" />
+    <MESSAGE value="feat: Implement proxy endpoint for manifest fetching to avoid CORS issues and enhance UI styling" />
+    <MESSAGE value="feat: Enhance manifest fetching with smart CORS handling and proxy fallback" />
+    <MESSAGE value="feat: Validate image object allocation and handle format discrepancies in PDF generation" />
+    <MESSAGE value="Update application version" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update application version" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
+  </component>
+</project>
