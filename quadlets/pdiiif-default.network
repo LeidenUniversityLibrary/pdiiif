@@ -1,0 +1,10 @@
+[Unit]
+Description=Pdiiif pdiiif-default Network
+
+[Network]
+NetworkName=pdiiif-default
+Driver=bridge
+
+[Install]
+WantedBy=default.target
+

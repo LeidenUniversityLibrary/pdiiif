@@ -992,14 +992,26 @@ export default class PDFGenerator {
       pageResources.Properties = properties;
     }
 
-    log.debug('Creating image objects.');
     const canvasIdx = this._canvasInfos.findIndex(
       (ci) => ci.canvas.id === canvasId
     );
+    if (canvasIdx < 0) {
+      throw new Error(`Canvas with id ${canvasId} was not pre-allocated.`);
+    }
+    const canvasInfo = this._canvasInfos[canvasIdx];
+
+    log.debug('Creating image objects.');
     for (const [imgIdx, img] of images.entries()) {
+      // Object numbers for all pages are allocated before any image is fetched.
+      // Use the format known during that allocation, rather than the response's
+      // Content-Type, to keep the written object count in sync with the page tree.
+      const numReservedImageObjects =
+        canvasInfo.images[imgIdx]?.format === 'jpeg' ? 1 : 3;
       if (isImageFetchFailure(img)) {
-        // Dummy image data object
-        this._addObject({});
+        // Fill every object slot reserved for the unavailable image.
+        for (let i = 0; i < numReservedImageObjects; i++) {
+          this._addObject({});
+        }
         if (this._polyglot) {
           // Dummy dummy zip header object
           this._addObject({});
@@ -1014,13 +1026,19 @@ export default class PDFGenerator {
         this._polyglot ? this._nextObjNo + 1 : this._nextObjNo
       );
 
-      if (img.format !== 'jpeg' && image instanceof JPEGImage) {
-        // We calculated with 3 objects for this image, since it was either identified
-        // as PNG or we did not have a format in the manifest. So we need to add empty
-        // dummy objects to keep the object numbers in sync.
-        let objNum = imageObjs.slice(-1)[0].num;
-        for (let i = 0; imageObjs.length < 3; i++) {
-          imageObjs.push({ num: objNum++ });
+      if (imageObjs.length > numReservedImageObjects) {
+        throw new Error(
+          `Image ${img.resource.id} requires ${imageObjs.length} PDF objects, ` +
+            `but only ${numReservedImageObjects} were pre-allocated.`
+        );
+      }
+      if (imageObjs.length < numReservedImageObjects) {
+        // The manifest's declared format can differ from the format returned by
+        // its Image API service (for example, a JP2 source served as JPEG).
+        // Pad unused slots so later page references remain correct.
+        let objNum = imageObjs.slice(-1)[0].num + 1;
+        while (imageObjs.length < numReservedImageObjects) {
+          imageObjs.push({ num: objNum++, data: {} });
         }
       }
 
@@ -1074,8 +1092,6 @@ export default class PDFGenerator {
         } as PdfDictionary);
       }
     }
-
-    const canvasInfo = this._canvasInfos[canvasIdx];
 
     // Embed OCR text, if present
     if (ocrText?.markup) {

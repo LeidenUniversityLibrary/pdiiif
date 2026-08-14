@@ -1,0 +1,30 @@
+name: Build, Push & Deploy
+
+on:
+  push:
+    branches: [ staging, production ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push-ghcr:
+    uses: LeidenUniversityLibrary/container-deploy-awx-action/.github/workflows/build-push-ghcr.yml@main
+    secrets: inherit
+    with:
+      production_branch: production
+      containerfile: Dockerfile
+
+  deploy-awx-podman:
+    name: Deploy via AWX (with quadlets)
+    needs:
+      - build-push-ghcr
+    uses: LeidenUniversityLibrary/container-deploy-awx-action/.github/workflows/deploy-awx-with-quadlets.yml@docker_compose_to_podman
+    secrets: inherit
+    with:
+      image: ${{ needs.build-push-ghcr.outputs.image }}
+      image_tag: ${{ needs.build-push-ghcr.outputs.branch_tag }}
+      quadlets_archive_b64: ${{ needs.generate-quadlets.outputs.quadlets_b64 }}
+

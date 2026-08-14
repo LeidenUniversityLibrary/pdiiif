@@ -1,11 +1,12 @@
 <script lang="ts">
   /// <reference types="wicg-file-system-access"/>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { _ } from 'svelte-i18n';
   import classNames from 'classnames';
   import {
     convertManifest,
     estimatePdfSize,
+    version,
     type Estimation,
     type ProgressStatus,
     type ProgressNotification,
@@ -22,7 +23,6 @@
   import GitHubIcon from './icons/GitHub.svelte';
   import QuestionIcon from './icons/Question.svelte';
 
-  import logoSvgUrl from '../assets/logo.svg';
   import ErrorIcon from './icons/Exclamation.svelte';
   import ProgressBar from './icons/ProgressBar.svelte';
   import {
@@ -36,6 +36,10 @@
   export let coverPageEndpoint: string = `${apiEndpoint}/coverpage`;
   export let initialManifestUrl: string | null = null;
   export let onError: ((err: Error) => void) | undefined = undefined;
+
+  // True when the app was opened with a ?manifest= URL param (launched from an external app).
+  // In that case we show a "Close" button after generation so the user can dismiss the tab.
+  const launchedFromExternalApp = initialManifestUrl !== null;
 
   // We use a self-hosted MITM page for the streamsaver service worker
   // to avoid GDPR issues.
@@ -67,6 +71,7 @@
   let infoPromise: Promise<ManifestInfo | void> | undefined;
   let estimatePromise: Promise<Estimation> | undefined;
   let sampledCanvases: CanvasNormalized[] | undefined;
+  let manifestRequestId = 0;
 
   // Only relevant for client-side generation
   let abortController: AbortController | undefined;
@@ -128,6 +133,7 @@
 
   /** Reset all state variables to their defaults. */
   function resetState() {
+    manifestRequestId += 1;
     manifestUrl = '';
     manifestUrlIsValid = undefined;
     currentProgress = undefined;
@@ -138,24 +144,64 @@
     infoPromise = undefined;
     estimatePromise = undefined;
     sampledCanvases = undefined;
+    canvasIdentifiers = undefined;
     scaleFactor = 1;
     optimizationConfig = undefined;
+    queueState = undefined;
+    notifyWhenDone = false;
+  }
+
+  /** Clear the current manifest and prepare the form for another PDF. */
+  async function clearManifest() {
+    clearNotifications();
+    resetState();
+    await tick();
+    manifestInput?.focus();
   }
 
   function updateEstimate() {
+    const requestId = ++manifestRequestId;
+    const requestedManifestUrl = manifestUrl;
+
+    // Create a custom fetch function that falls back to proxy only on CORS errors
+    const smartFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+
+      // Try direct fetch first
+      try {
+        return await fetch(input, init);
+      } catch (err) {
+        // If CORS error, fall back to proxy
+        if ((err as Error).message?.includes('CORS') || (err as Error).name === 'TypeError') {
+          console.log(`Falling back to proxy for: ${url}`);
+          const encodedUrl = encodeURIComponent(url);
+          const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
+          return fetch(proxyUrl, init);
+        }
+        throw err;
+      }
+    };
+
     // No async/await, since we need to keep a reference to the promise around
-    infoPromise = fetchManifestInfo(manifestUrl)
+    infoPromise = fetchManifestInfo(requestedManifestUrl, apiEndpoint)
       .then((info) => {
+        if (requestId !== manifestRequestId) {
+          return;
+        }
         manifestInfo = info;
         estimatePromise = estimatePdfSize({
-          manifest: manifestInfo.manifest.id,
+          manifest: manifestInfo.manifest.id,  // Pass the manifest ID string
           filterCanvases: canvasIdentifiers,
           concurrency: 4,
           scaleFactor,
           numSamples: 8,
           optimization: optimizationConfig,
           sampleCanvases: sampledCanvases,
+          customFetch: smartFetch,  // Use smart fetch with proxy fallback
         }).then((estimation) => {
+          if (requestId !== manifestRequestId) {
+            return estimation;
+          }
           if (!estimation.corsSupported) {
             // Show a warning if the Image API endpoint does not support CORS
             addNotification({
@@ -169,12 +215,15 @@
         return info;
       })
       .catch((err) => {
+        if (requestId !== manifestRequestId) {
+          return;
+        }
         infoPromise = undefined;
         onError?.(err);
         addNotification({
           type: 'error',
           message: $_('errors.manifest_fetch', {
-            values: { manifestUrl, errorMsg: err.message },
+            values: { manifestUrl: requestedManifestUrl, errorMsg: err.message },
           }),
           tags: ['validation'],
         });
@@ -220,7 +269,20 @@
   async function generatePdfClientSide(): Promise<void> {
     let manifestResp: Response;
     try {
-      manifestResp = await fetch(manifestUrl);
+      // Try direct fetch first, fall back to proxy only on CORS error
+      try {
+        manifestResp = await fetch(manifestUrl);
+      } catch (err) {
+        // If CORS error, use proxy as fallback
+        if ((err as Error).message?.includes('CORS') || (err as Error).name === 'TypeError') {
+          console.log(`CORS error detected, using proxy for manifest fetch: ${manifestUrl}`);
+          const encodedUrl = encodeURIComponent(manifestUrl);
+          const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
+          manifestResp = await fetch(proxyUrl);
+        } else {
+          throw err;
+        }
+      }
     } catch (err) {
       onError?.(err as Error);
       addNotification({
@@ -511,12 +573,13 @@
   }
 </script>
 
-<div class="w-full md:w-2/3 xl:w-1/2">
+<div class="w-full md:w-2/3 xl:w-1/2 max-w-2xl">
   <img
-    src={logoSvgUrl}
-    alt="pdiiif logo"
-    class="w-24 mx-auto mb-4 filter drop-shadow-lg"
+    src="/uni_logo.png"
+    alt="University logo"
+    class="w-48 h-48 mx-auto mb-4 object-contain rounded-xl"
   />
+  <h1 class="text-3xl font-bold text-center mb-6" style="color: var(--muted);">IIIF PDF-generator</h1>
   <div>
     {#each notifications as notification}
       <Notification
@@ -531,30 +594,48 @@
       </Notification>
     {/each}
   </div>
-  <div class="flex flex-col bg-blue-400 m-auto p-4 rounded-md shadow-lg">
+  <div class="flex flex-col m-auto p-8 rounded-2xl shadow-2xl" style="background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 10px 30px rgba(2,6,23,0.6);">
     {#if infoPromise}
       <Preview {infoPromise} {estimatePromise} {canvasIdentifiers} />
     {/if}
-    <div class="relative flex text-gray-700 justify-end">
-      <input
-        bind:this={manifestInput}
-        class={classNames(
-          'w-full h-10 px-3 text-base placeholder-gray-600 rounded-l-lg',
-          {
-            'border-4 border-red-500':
-              manifestUrl.length > 0 && !manifestUrlIsValid,
-          }
-        )}
-        type="url"
-        placeholder="Manifest URL"
-        name="manifest-url"
-        disabled={currentProgress !== undefined && !pdfFinished}
-        bind:value={manifestUrl}
-      />
+    <div class="flex justify-end">
+      <div class="relative flex-1 min-w-0">
+        <input
+          bind:this={manifestInput}
+          class={classNames(
+            'w-full h-12 px-4 pr-12 text-base bg-white bg-opacity-10 text-white placeholder-gray-400 rounded-l-lg border border-white border-opacity-10 focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all',
+            {
+              'border-4 border-red-500':
+                manifestUrl.length > 0 && !manifestUrlIsValid,
+            }
+          )}
+          type="url"
+          placeholder="Manifest URL"
+          name="manifest-url"
+          disabled={currentProgress !== undefined && !pdfFinished}
+          bind:value={manifestUrl}
+        />
+        {#if manifestUrl}
+          <button
+            type="button"
+            class="absolute inset-y-0 right-0 flex w-12 items-center justify-center text-white opacity-70 transition-opacity hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-25"
+            on:click={clearManifest}
+            disabled={currentProgress !== undefined && !pdfFinished}
+            title={$_('buttons.clear_manifest')}
+            aria-label={$_('buttons.clear_manifest')}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="h-5 w-5 fill-current">
+              <path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.7 4.29 4.29 10.59 10.59 16.89 4.29z" />
+            </svg>
+          </button>
+        {/if}
+      </div>
       <button
+        type="submit"
         on:click={generatePdf}
         disabled={!manifestUrlIsValid || (currentProgress && !pdfFinished)}
-        class="inset-y-0 right-0 flex items-center p-1 px-2 font-bold text-white disabled:opacity-25 bg-brand rounded-r whitespace-nowrap"
+        class="inset-y-0 right-0 flex items-center p-1 px-4 font-semibold text-white disabled:opacity-25 rounded-r-lg whitespace-nowrap transition-all hover:shadow-lg"
+        style="background: var(--accent); box-shadow: 0 4px 15px rgba(0,17,88,0.3);"
       >
         <svg
           viewBox="0 0 24 24"
@@ -582,9 +663,9 @@
     {#if (currentProgress || queueState) && !pdfFinished && !cancelled}
       <div>
         {#if window.Notification && window.Notification.permission !== 'denied'}
-          <label
-            ><input type="checkbox" bind:checked={notifyWhenDone} />
-            {$_('buttons.notify')}</label
+          <label class="text-white flex items-center gap-2 mb-2"
+            ><input type="checkbox" bind:checked={notifyWhenDone} class="w-4 h-4 accent-accent" />
+            <span>{$_('buttons.notify')}</span></label
           >
         {/if}
         <ProgressBar
@@ -616,7 +697,7 @@
       </div>
       {#if abortController && !cancelled}
         <button
-          class="mx-auto mt-2 px-2 py-1 font-bold text-white disabled:opacity-25 bg-red-600 rounded-lg hover:bg-red-500 focus:bg-red-700"
+          class="mx-auto mt-2 px-4 py-2 font-semibold text-white disabled:opacity-25 bg-red-600 rounded-lg hover:bg-red-500 focus:bg-red-700 transition-all hover:shadow-lg"
           on:click={cancelGeneration}
           disabled={cancelRequested}
         >
@@ -632,6 +713,33 @@
         </button>
       {/if}
     {/if}
+    {#if pdfFinished && !cancelled && launchedFromExternalApp}
+      <button
+        class="mx-auto mt-4 px-4 py-2 font-semibold text-white bg-white bg-opacity-10 rounded-lg hover:bg-opacity-20 transition-all border border-white border-opacity-20"
+        on:click={() => window.close()}
+      >
+        {$_('buttons.close')}
+      </button>
+    {/if}
   </div>
 
+  <!-- Version indicator and footer -->
+  <div class="text-center mt-6 text-sm opacity-60" style="color: var(--muted);">
+    <div class="flex items-center justify-center gap-4 mb-3">
+      <p>v{version}</p>
+      <!-- <a
+        href="https://github.com/jbaiter/pdiiif"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center hover:opacity-100 transition-opacity"
+        style="color: var(--accent);"
+        title="View on GitHub"
+      >
+        <GitHubIcon classes="w-5 h-5" />
+      </a> -->
+    </div>
+    <div class="pt-3 border-t border-white border-opacity-5">
+      <p class="text-xs">Secure and managed by Leiden University Library</p>
+    </div>
+  </div>
 </div>

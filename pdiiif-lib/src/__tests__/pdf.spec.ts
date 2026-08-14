@@ -62,34 +62,36 @@ describe('PDF generation', () => {
               x: 0,
               y: 0,
               width: 1024,
-              height: 1024
+              height: 1024,
             },
           ],
           numAnnotations: 0,
         },
       ],
       outline: [],
-      pageLabels: ['Tüst Läbel']
-  });
+      pageLabels: ['Tüst Läbel'],
+    });
     await pdfgen.setup();
     const imgBuf = await fs.promises.readFile(
       path.resolve(__dirname, './fixtures/wunder.jpg')
     );
     await pdfgen.renderPage(
-      'http://some.fixture',
+      'foo',
       { width: 290, height: 400 },
       [
         {
           resource: { id: 'someid', type: 'Image' },
-          width: 290, height: 400,
-          x: 0, y: 0,
+          width: 290,
+          height: 400,
+          x: 0,
+          y: 0,
           data: imgBuf,
           numBytes: imgBuf.length,
           corsAvailable: true,
           choiceInfo: {
             enabled: true,
             optional: false,
-            visibleByDefault: true
+            visibleByDefault: true,
           },
           format: 'jpeg',
         },
@@ -110,6 +112,91 @@ describe('PDF generation', () => {
       height: 400,
     });
     expect(parsed.getTitle()).toEqual('Täst Tütle');
+    fs.unlinkSync(pdfPath);
+  });
+
+  it('keeps page object references valid when a JP2 source is served as JPEG', async () => {
+    const pdfPath = tmp.tmpNameSync({
+      prefix: 'pdiiif-format-mismatch-test-',
+      postfix: '.pdf',
+    });
+    const writer = new NodeWriter(fs.createWriteStream(pdfPath));
+    const canvasIds = ['canvas-1', 'canvas-2'];
+    const pdfgen = new PDFGenerator({
+      writer,
+      metadata: {},
+      langPref: ['en'],
+      canvasInfos: canvasIds.map((id, canvasIdx) => ({
+        canvas: { id, type: 'Canvas' },
+        canvasIdx,
+        images: [
+          {
+            resource: { id: `source-${canvasIdx}.jp2`, type: 'Image' },
+            x: 0,
+            y: 0,
+            width: 290,
+            height: 400,
+            format: 'unsupported',
+          },
+        ],
+        numAnnotations: 0,
+      })),
+      outline: [],
+      pageLabels: [],
+    });
+    const imgBuf = await fs.promises.readFile(
+      path.resolve(__dirname, './fixtures/wunder.jpg')
+    );
+
+    await pdfgen.setup();
+    for (const [canvasIdx, canvasId] of canvasIds.entries()) {
+      await pdfgen.renderPage(
+        canvasId,
+        { width: 290, height: 400 },
+        [
+          {
+            resource: { id: `source-${canvasIdx}.jp2`, type: 'Image' },
+            width: 290,
+            height: 400,
+            x: 0,
+            y: 0,
+            data: imgBuf,
+            numBytes: imgBuf.length,
+            corsAvailable: true,
+            format: 'jpeg',
+          },
+        ],
+        [],
+        undefined,
+        72
+      );
+    }
+    await pdfgen.end();
+
+    const pdfData = await fs.promises.readFile(pdfPath);
+    const pdfText = pdfData.toString('latin1');
+    const definedObjectNumbers = new Set(
+      Array.from(
+        pdfText.matchAll(/(?:^|\n)(\d+) 0 obj\n/g),
+        (match) => match[1]
+      )
+    );
+    const referencedObjectNumbers = Array.from(
+      pdfText.matchAll(/\b(\d+) 0 R\b/g),
+      (match) => match[1]
+    );
+    expect(
+      referencedObjectNumbers.filter(
+        (objectNumber) => !definedObjectNumbers.has(objectNumber)
+      )
+    ).toEqual([]);
+
+    const parsed = await PDFDocument.load(pdfData.buffer.slice(0));
+    expect(parsed.getPageCount()).toBe(2);
+    expect(parsed.getPages().map((page) => page.getSize())).toEqual([
+      { width: 290, height: 400 },
+      { width: 290, height: 400 },
+    ]);
     fs.unlinkSync(pdfPath);
   });
 });

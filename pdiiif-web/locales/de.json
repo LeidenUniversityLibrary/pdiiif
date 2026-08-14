@@ -25,6 +25,7 @@
     },
     "buttons": {
         "generate": "PDF erstellen",
+        "clear_manifest": "Manifest-URL löschen",
         "cancel": "PDF-Erstellung abbrechen",
         "close": "Schließen",
         "settings": "Einstellungen",

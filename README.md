@@ -8,15 +8,19 @@
 
 **pdiiif** is a JavaScript library to **create PDFs from IIIF Manifests.**
 For the most part, it runs both in browsers and as a Node.js server-side
-application. When generating a PDF in the browser, almost all communication happens
-directly between the user's browser and the IIIF APIs referenced from the Manifest.
-The only exception is for generating the cover page, which by default needs to be
-generated on the server. (see [this section](#cover-page-endpoints) for more details)
+application. When generating a PDF in the browser, image and OCR downloads happen
+directly between the user's browser and the IIIF APIs referenced from the Manifest
+when CORS allows it. The bundled web application can also use the API server to
+fetch manifests through a small proxy endpoint when manifest CORS headers would
+otherwise block the browser. Cover pages are generated on the server by default
+(see [this section](#cover-page-endpoints) for more details).
 
 It comes with a small **sample web application** that demonstrates
 how to use the library in the browser, you can check out a public instance
 of it at https://pdiiif.jbaiter.de, the source code is located in the
 [`pdiiif-web` subdirectory](https://github.com/jbaiter/pdiiif/tree/main/pdiiif-web).
+The web app can be launched with an initial manifest URL via the `?manifest=`
+query parameter, which is useful when opening pdiiif from another application.
 
 A main goal of the library is to be as _memory-efficient_ as possible, by
 never holding more than a few pages in memory and streaming directly to
@@ -50,18 +54,53 @@ and his work on [Poc||GTFO](https://pocorgtfo.hacke.rs/) for the inspiration!)
 - [x] Rendering of IIIF Annotations as PDF annotations
 - [x] Include IIIF Manifest and referenced OCR files as PDF attachments
 - [x] Generate polyglot PDFs that are also ZIP files of all resources
+- [x] JPEG optimization and PNG image support
+- [x] Server-assisted manifest fetching for the web app via `/api/proxy-manifest`
+- [x] Work around duplicate AnnotationPage/Annotation IDs in some malformed IIIF 3 manifests
 
 
 ## Quickstart
 
 Besides using the public instance at https://pdiiif.jbaiter.de, you can also run the app yourself.
-The easiest way to do this is with Docker:
+The easiest way to run the bundled web app and API together is with Docker:
 
+```bash
+docker build . -t pdiiif
+
+# SYS_ADMIN is required for the headless Chromium instance that generates cover page PDFs.
+docker run -p 8080:8080 --cap-add=SYS_ADMIN --name pdiiif pdiiif
 ```
-$ docker build . -t pdiiif
-# SYS_ADMIN capabilities are required (for Puppeteer's headless Chrome instance to generate cover page PDFs)
-$ docker run -p 8080:8080 --cap-add=SYS_ADMIN --name pdiiif pdiiif
+
+Open http://localhost:8080 after the container starts.
+
+The included compose file is configured for local container deployment on port 8082:
+
+```bash
+docker compose up --build
+# or: podman-compose up --build
 ```
+
+Open http://localhost:8082 when using compose.
+
+For local development, run the API and web app in separate terminals:
+
+```bash
+pnpm install
+pnpm --filter pdiiif-server run dev
+pnpm --filter pdiiif-web run dev
+```
+
+The web development server uses `http://localhost:31337/api` by default.
+
+
+## Deployment
+
+Container images are built from the root `Dockerfile`. The repository also contains:
+
+- [`DEPLOYMENT.md`](./DEPLOYMENT.md): production deployment runbook, including GHCR image tags, server update commands, and Caddy configuration.
+- [`docker-compose.yml`](./docker-compose.yml): local/container deployment configuration with `CFG_PORT=8082`.
+- [`quadlets/`](./quadlets): rootless Podman quadlet units and a generator script for running pdiiif under user systemd.
+- [`Caddyfile-addition.txt`](./Caddyfile-addition.txt): reverse proxy snippet for `iiif-pdf-a.universiteitleiden.nl`.
 
 
 ## Cookbook Matrix
@@ -140,10 +179,12 @@ of the recipe support in pdiiif:
     the Native Filesystem API or service workers.
 - [`./pdiiif-web`](https://github.com/jbaiter/pdiiif/tree/main/pdiiif-web): Sample web application (using Svelte)
   to demonstrate using pdiiif in the browser
+- [`./quadlets`](./quadlets): Podman quadlet files for rootless systemd deployment
+- [`./DEPLOYMENT.md`](./DEPLOYMENT.md): Operational notes for GHCR, Podman, Caddy, and production updates
 
 ## Cover Page Endpoints
 
-pdiiif tries to includes a cover page with a thumbnail, descriptive metadata and rights and attribution information.
+pdiiif tries to include a cover page with a thumbnail, descriptive metadata and rights and attribution information.
 Since typesetting these pages is beyond the scope of what our bespoke PDF generator can provide (most notably, TTF/OTF
 font retrieval for arbitrary languages/scripts and font subsetting), this cover page currently needs to be generated
 elsewhere. By default, the library is using a public endpoint at https://pdiiif.jbaiter.de/api/coverpage, which generates
@@ -151,8 +192,8 @@ a PDF with the default template. The endpoint can be changed with the `coverPage
 options passed to the `convertManifest` function.
 
 If you want to customize the template that is being used, you can either host the API provided in this repository yourself
-(see [Quickstart](quickstart)) and override the template by mounting your own custom [Handlebars](https://handlebarsjs.com/)
-template into the image at `/opt/pdiiif/pdiiif-api/dist/asses/coverpage.hbs`. For a list of available helpers that you can
+(see [Quickstart](#quickstart)) and override the template by mounting your own custom [Handlebars](https://handlebarsjs.com/)
+template into the image at `/opt/pdiiif/pdiiif-api/dist/assets/coverpage.hbs`. For a list of available helpers that you can
 use, refer to [`handlebars-helpers`](https://github.com/helpers/handlebars-helpers#helpers). Also available are these two
 custom helpers:
 - `qrcode`, takes a value and an optional `{ width, height, padding, color, background, ecl }` options object and returns

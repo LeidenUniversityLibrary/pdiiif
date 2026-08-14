@@ -1,0 +1,8 @@
+iiif-pdf-a.universiteitleiden.nl {
+    log
+    tls /run/secrets/iiif-cert.pem /run/secrets/iiif-key.pem
+    @pdiiif host iiif-pdf-a.universiteitleiden.nl
+    reverse_proxy @pdiiif host.containers.internal:8082
+}
+
+

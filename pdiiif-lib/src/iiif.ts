@@ -434,8 +434,26 @@ export function getImageFormat(
 /** Get information about images on a Canvas. */
 export function getImageInfos(canvas: CanvasNormalized): ImageInfo[] {
   const imageInfos: ImageInfo[] = [];
-  const paintingAnnos = vault.get<AnnotationPageNormalized>(canvas.items)
-    .flatMap((ap) => vault.get<AnnotationNormalized>(ap.items));
+  log.debug(`getImageInfos for canvas: ${canvas.id}`);
+  log.debug(`  Canvas has ${canvas.items?.length || 0} item reference(s)`);
+
+  const annotationPages = vault.get<AnnotationPageNormalized>(canvas.items);
+  log.debug(`  Retrieved ${annotationPages.length} AnnotationPage(s) from vault`);
+
+  const paintingAnnos = annotationPages.flatMap((ap, apIdx) => {
+    log.debug(`  AnnotationPage ${apIdx}: ${ap.id}, has ${ap.items?.length || 0} item(s)`);
+    const annos = vault.get<AnnotationNormalized>(ap.items);
+    log.debug(`    Retrieved ${annos.length} annotation(s) from vault`);
+    if (annos.length === 0 && ap.items && ap.items.length > 0) {
+      log.warn(`    ⚠️  WARNING: AnnotationPage has ${ap.items.length} items but vault.get returned 0 annotations!`);
+      log.warn(`    This suggests duplicate IDs or vault corruption.`);
+      log.warn(`    Item IDs: ${JSON.stringify(ap.items)}`);
+    }
+    return annos;
+  });
+
+  log.debug(`  Total painting annotations: ${paintingAnnos.length}`);
+
   for (const anno of paintingAnnos) {
     const annoTarget = anno.target as any;
     let target;

@@ -575,9 +575,13 @@ export async function fetchCanvasData(
 
 /** Download the JSON data for a manifest, handling stuff like broken CORS implementations
  *  and Content-Negotiation for IIIFv3 */
-export async function fetchManifestJson(manifestUrl: string): Promise<any> {
+export async function fetchManifestJson(
+  manifestUrl: string,
+  customFetch?: typeof fetch
+): Promise<any> {
+  const fetchFn = customFetch || fetch;
   try {
-    const resp = await fetch(manifestUrl, {
+    const resp = await fetchFn(manifestUrl, {
       headers: {
         Accept: MANIFEST_ACCEPT_HEADER
       }
@@ -587,7 +591,7 @@ export async function fetchManifestJson(manifestUrl: string): Promise<any> {
     // Check if fetching failed due to CORS by downgrading the request to a
     // 'simple' request by removing the `Accept` header, which makes the
     // request CORS-unsafe due to double quotes and the colon in the URL
-    const resp = await fetch(manifestUrl);
+    const resp = await fetchFn(manifestUrl);
     return await resp.json();
   }
 }

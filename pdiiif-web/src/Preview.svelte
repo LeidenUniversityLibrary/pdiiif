@@ -10,7 +10,7 @@
   export let canvasIdentifiers: string[] | undefined;
 </script>
 
-<div class="flex bg-indigo-100 p-2 rounded-md mb-4">
+<div class="flex flex-col sm:flex-row items-start bg-indigo-50 p-4 rounded-md mb-4 overflow-hidden">
   {#await infoPromise}
     <Spinner />
   {:then manifestInfo}
@@ -18,10 +18,12 @@
       <img
         src={manifestInfo.previewImageUrl}
         alt="preview"
-        class="inline w-32 mr-8 object-scale-down"
+        class="w-32 max-h-52 mb-4 sm:mb-0 sm:mr-8 object-contain flex-none"
       />
-      <div>
-        <h2 class="font-bold text-lg mt-4">{manifestInfo.label}</h2>
+      <div class="min-w-0 flex-1">
+        <h2 class="manifest-title font-bold text-lg" title={manifestInfo.label}>
+          {manifestInfo.label}
+        </h2>
         <ul class="mt-4">
           <li>
             {canvasIdentifiers?.length || manifestInfo.canvasIds.length}
@@ -46,19 +48,29 @@
                     >
                   {/if}
                 {:else}
-                  <strong>{$_('errors.estimate_failure')}</strong>
+                  <strong class="text-red-400">{$_('errors.estimate_failure')}</strong>
                 {/if}
               {:catch}
-                <strong>{$_('errors.estimate_failure')}</strong>
+                <strong class="text-red-400">{$_('errors.estimate_failure')}</strong>
               {/await}
             </li>
           {/if}
         </ul>
       </div>
     {:else}
-      <p>{$_('errors.estimate_failure')}</p>
+      <p class="text-red-400">{$_('errors.estimate_failure')}</p>
     {/if}
   {:catch}
-    <p>{$_('errors.estimate_failure')}</p>
+    <p class="text-red-400">{$_('errors.estimate_failure')}</p>
   {/await}
 </div>
+
+<style>
+  .manifest-title {
+    display: -webkit-box;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+  }
+</style>

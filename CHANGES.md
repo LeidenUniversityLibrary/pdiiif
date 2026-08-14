@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] - 2026-08-13
+
+- pdiiif-web: Use Leiden University blue as the primary interface colour.
+- pdiiif-web: Keep long manifest titles contained within the preview card.
+- pdiiif-web: Allow users to clear the current manifest and generate another PDF without refreshing the page.
+
 ## [0.2.7] - 2025-07-13
 ### Fixed
 - pdiiif-lib: Fix bad `CMapName` on character mapping object that caused the OCR
