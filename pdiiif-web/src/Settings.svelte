@@ -32,6 +32,10 @@
       previewImageData = estimation.sampleImageData;
       previewImageMimeType = estimation.sampleImageMimeType;
       waitingForPreviewUpdate = false;
+    }).catch(() => {
+      previewImageData = undefined;
+      previewImageMimeType = undefined;
+      waitingForPreviewUpdate = false;
     });
   }
 
