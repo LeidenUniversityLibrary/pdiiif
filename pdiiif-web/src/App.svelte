@@ -17,6 +17,8 @@
   import streamSaver from 'streamsaver';
 
   import { fetchManifestInfo, type ManifestInfo } from './iiif';
+  import { createManifestFetch } from './manifest-fetch';
+  import { createWasmLoader } from './wasm';
   import Preview from './Preview.svelte';
   import Settings from './Settings.svelte';
   import Notification from './Notification.svelte';
@@ -36,6 +38,10 @@
   export let coverPageEndpoint: string = `${apiEndpoint}/coverpage`;
   export let initialManifestUrl: string | null = null;
   export let onError: ((err: Error) => void) | undefined = undefined;
+
+  const manifestFetch = createManifestFetch(apiEndpoint);
+  const saxWasmLoader = createWasmLoader(apiEndpoint, 'sax-wasm.wasm');
+  const mozjpegWasmLoader = createWasmLoader(apiEndpoint, 'mozjpeg_enc.wasm');
 
   // True when the app was opened with a ?manifest= URL param (launched from an external app).
   // In that case we show a "Close" button after generation so the user can dismiss the tab.
@@ -163,25 +169,6 @@
     const requestId = ++manifestRequestId;
     const requestedManifestUrl = manifestUrl;
 
-    // Create a custom fetch function that falls back to proxy only on CORS errors
-    const smartFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
-
-      // Try direct fetch first
-      try {
-        return await fetch(input, init);
-      } catch (err) {
-        // If CORS error, fall back to proxy
-        if ((err as Error).message?.includes('CORS') || (err as Error).name === 'TypeError') {
-          console.log(`Falling back to proxy for: ${url}`);
-          const encodedUrl = encodeURIComponent(url);
-          const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
-          return fetch(proxyUrl, init);
-        }
-        throw err;
-      }
-    };
-
     // No async/await, since we need to keep a reference to the promise around
     infoPromise = fetchManifestInfo(requestedManifestUrl, apiEndpoint)
       .then((info) => {
@@ -197,7 +184,9 @@
           numSamples: 8,
           optimization: optimizationConfig,
           sampleCanvases: sampledCanvases,
-          customFetch: smartFetch,  // Use smart fetch with proxy fallback
+          customFetch: manifestFetch,
+          saxWasmLoader,
+          mozjpegWasmLoader,
         }).then((estimation) => {
           if (requestId !== manifestRequestId) {
             return estimation;
@@ -211,6 +200,17 @@
           }
           sampledCanvases = estimation.sampleCanvases;
           return estimation;
+        });
+        estimatePromise.catch((err: Error) => {
+          if (requestId === manifestRequestId) {
+            onError?.(err);
+            addNotification({
+              type: 'error',
+              message: $_('errors.estimate_failure_detail', {
+                values: { errorMsg: err.message },
+              }),
+            });
+          }
         });
         return info;
       })
@@ -269,19 +269,9 @@
   async function generatePdfClientSide(): Promise<void> {
     let manifestResp: Response;
     try {
-      // Try direct fetch first, fall back to proxy only on CORS error
-      try {
-        manifestResp = await fetch(manifestUrl);
-      } catch (err) {
-        // If CORS error, use proxy as fallback
-        if ((err as Error).message?.includes('CORS') || (err as Error).name === 'TypeError') {
-          console.log(`CORS error detected, using proxy for manifest fetch: ${manifestUrl}`);
-          const encodedUrl = encodeURIComponent(manifestUrl);
-          const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
-          manifestResp = await fetch(proxyUrl);
-        } else {
-          throw err;
-        }
+      manifestResp = await manifestFetch(manifestUrl);
+      if (!manifestResp.ok) {
+        throw new Error(`HTTP ${manifestResp.status}`);
       }
     } catch (err) {
       onError?.(err as Error);
@@ -385,6 +375,8 @@
         optimization: optimizationConfig,
         polyglotZipPdf: true,
         polyglotZipBaseDir: cleanLabel,
+        saxWasmLoader,
+        mozjpegWasmLoader,
       };
       if (webWritable === undefined) {
         const res = await convertManifest(manifestJson, webWritable, params);
@@ -512,7 +504,18 @@
     pdfFinished = false;
     let promise: Promise<void>;
     let generateOnClient: boolean;
-    const { size: sizeEstimate, corsSupported } = (await estimatePromise)!;
+    if (!estimatePromise) {
+      addNotification({ type: 'error', message: $_('errors.estimate_failure') });
+      return;
+    }
+    let estimate: Estimation;
+    try {
+      estimate = await estimatePromise;
+    } catch {
+      // The estimate failure is already shown by updateEstimate.
+      return;
+    }
+    const { size: sizeEstimate, corsSupported } = estimate;
     if (!corsSupported) {
       generateOnClient = false;
     } else if (supportsFilesystemAPI || supportsStreamsaver()) {

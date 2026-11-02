@@ -7,6 +7,7 @@
         "pdf_failure": "Failed to generate PDF: {errorMsg}",
         "pdf_failure_conn": "Failed to generate PDF: Could not connect to server at {apiEndpoint}",
         "estimate_failure": "Failed to load size estimate.",
+        "estimate_failure_detail": "Failed to load size estimate: {errorMsg}",
         "invalid_canvas_range": "Invalid canvas range: {range}",
         "invalid_canvas_range_bad_index": "Invalid canvas range: {range}, only values between 1 and {canvasCount} are allowed.",
         "pdfgen": {

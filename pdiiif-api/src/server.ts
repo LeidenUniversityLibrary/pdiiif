@@ -1,5 +1,7 @@
 import fs from 'fs';
+import { readFile } from 'fs/promises';
 import https from 'https';
+import { createRequire } from 'module';
 import express, { Express, Response } from 'express';
 import bodyParser from 'body-parser';
 import { range, maxBy } from 'lodash-es';
@@ -30,8 +32,15 @@ import log from './logger.js';
 import { CoverPageGenerator, CoverPageParams } from './coverpage.js';
 import { RateLimiter } from './limit.js';
 import { GeneratorQueue } from './queue.js';
+import { fetchPublicManifest, InvalidManifestUrlError } from './manifest-proxy.js';
 
 const vault: Vault = globalVault();
+const libraryRequire = createRequire(import.meta.resolve('pdiiif'));
+const ocrRequire = createRequire(libraryRequire.resolve('ocr-parser/package.json'));
+const saxWasmPath = ocrRequire.resolve('sax-wasm/lib/sax-wasm.wasm');
+const mozjpegWasmPath = libraryRequire.resolve('@jsquash/jpeg/codec/enc/mozjpeg_enc.wasm');
+const saxWasmLoader = async () => new Uint8Array(await readFile(saxWasmPath));
+const mozjpegWasmLoader = async () => new Uint8Array(await readFile(mozjpegWasmPath));
 
 async function validateManifest(res: Response, manifestUrl: any): Promise<any> {
   const badManifestUrl =
@@ -146,6 +155,13 @@ app.use(
   })
 );
 
+app.get('/api/wasm/sax-wasm.wasm', (_req, res) => {
+  res.type('application/wasm').sendFile(saxWasmPath);
+});
+app.get('/api/wasm/mozjpeg_enc.wasm', (_req, res) => {
+  res.type('application/wasm').sendFile(mozjpegWasmPath);
+});
+
 app.use('/docs', openApiMiddleware.swaggerui);
 app.use(express.json());
 
@@ -226,13 +242,8 @@ app.get('/api/proxy-manifest', async (req, res) => {
     return;
   }
 
-  if (!manifestUrl.startsWith('http://') && !manifestUrl.startsWith('https://')) {
-    res.status(400).json({ error: 'manifestUrl must be a valid HTTP(S) URL' });
-    return;
-  }
-
   try {
-    const manifestResp = await fetch(manifestUrl);
+    const manifestResp = await fetchPublicManifest(manifestUrl, req.get('Accept'));
     
     if (!manifestResp.ok) {
       res.status(manifestResp.status).json({
@@ -244,14 +255,12 @@ app.get('/api/proxy-manifest', async (req, res) => {
     const manifestJson = await manifestResp.json();
     res.status(200).json(manifestJson);
   } catch (err) {
-    log.error({
-      message: 'Error proxying manifest request',
-      manifestUrl,
-      error: err,
-    });
-    res.status(500).json({
-      error: `Failed to fetch manifest: ${(err as Error).message}`,
-    });
+    if (err instanceof InvalidManifestUrlError) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+    log.error({ message: 'Error proxying manifest request', error: err });
+    res.status(502).json({ error: 'Failed to fetch manifest' });
   }
 });
 
@@ -442,6 +451,8 @@ app.get(
           abortController,
           polyglotZipPdf: true,
           polyglotZipBaseDir: cleanLabel,
+          saxWasmLoader,
+          mozjpegWasmLoader,
         }),
       primaryImageHost as string,
       onQueueAdvance

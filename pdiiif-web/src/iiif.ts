@@ -15,6 +15,7 @@ import {
 } from '@atlas-viewer/iiif-image-api';
 import { fetchManifestJson } from 'pdiiif';
 import { vault } from 'pdiiif';
+import { createManifestFetch } from './manifest-fetch';
 
 const thumbHelper = createThumbnailHelper(vault);
 
@@ -31,27 +32,10 @@ export async function fetchManifestInfo(
   manifestUrl: string,
   apiEndpoint?: string
 ): Promise<ManifestInfo> {
-  let manifestJson;
-  
-  // Try direct fetch first, fall back to proxy only if CORS fails
-  try {
-    manifestJson = await fetchManifestJson(manifestUrl);
-  } catch (err) {
-    // If direct fetch fails and we have a proxy endpoint, try using it
-    if (apiEndpoint && (err as Error).message?.includes('CORS')) {
-      console.log(`CORS error detected, falling back to proxy for: ${manifestUrl}`);
-      const encodedUrl = encodeURIComponent(manifestUrl);
-      const proxyUrl = `${apiEndpoint}/proxy-manifest?manifestUrl=${encodedUrl}`;
-      const response = await window.fetch(proxyUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch manifest via proxy: ${response.statusText}`);
-      }
-      manifestJson = await response.json();
-    } else {
-      // Re-throw if it's not a CORS issue or we don't have a proxy
-      throw err;
-    }
-  }
+  const manifestJson = await fetchManifestJson(
+    manifestUrl,
+    apiEndpoint ? createManifestFetch(apiEndpoint) : undefined
+  );
   
   const manifest = (await vault.loadManifest(manifestUrl, manifestJson))!;
   const canvases = vault.get<CanvasNormalized>(manifest.items);
