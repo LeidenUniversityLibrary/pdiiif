@@ -16,6 +16,7 @@ import {
 import { fetchManifestJson } from 'pdiiif';
 import { vault } from 'pdiiif';
 import { createManifestFetch } from './manifest-fetch';
+import { getManifestId } from './manifest-id';
 
 const thumbHelper = createThumbnailHelper(vault);
 
@@ -37,7 +38,10 @@ export async function fetchManifestInfo(
     apiEndpoint ? createManifestFetch(apiEndpoint) : undefined
   );
   
-  const manifest = (await vault.loadManifest(manifestUrl, manifestJson))!;
+  const manifest = (await vault.loadManifest(
+    getManifestId(manifestUrl, manifestJson),
+    manifestJson
+  ))!;
   const canvases = vault.get<CanvasNormalized>(manifest.items);
   const canvasIds = canvases.map((c) => c.id);
   const images = canvases
